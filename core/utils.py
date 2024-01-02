@@ -165,7 +165,7 @@ class ProjectAllocator(nn.Module):
             median_amount = torch.topk(tensor, k=num_bids // 2 + 1).values[-1].reshape(1, 1)
             # concatenate the results
             median_amounts.append(median_amount)
-            # we keep a running counter of the scaled min amount to prevent having an extremely large sum later on (overflows the extended K capacity of halo2 with SRS with k=26 (max public))
+            # we keep a running counter of the scaled min amount to prevent having an extremely large sum later on (overflows the extended K capacity of halo2 with SRS with k=26 (max public) when inverted using a lookup table)
             scaled_min_amounts.append(median_amount * self.min_ratio)
             votes.append(votes_count)
 
