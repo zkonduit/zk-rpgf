@@ -152,22 +152,25 @@ class ProjectAllocator(nn.Module):
         """
         Calculate the raw allocation amount of each project, then scale allocations to the total amount of OP and filter out those with less than 1500 OP.
         """
-        res = []
+        median_amounts = []
+        votes = []
         for tensor in x:
-            count = torch.unique(tensor[:, 0]).shape[0]
-            votes_count = torch.tensor([count]).reshape(1, 1)
             num_bids = tensor.shape[0]
+            votes_count = torch.tensor([num_bids]).reshape(1, 1)
             median_amount = torch.topk(tensor[:, 1], k=num_bids // 2 + 1).values[-1].reshape(1, 1)
             # concatenate the results
-            res.append(torch.cat([votes_count, median_amount], dim=1))
-        project_allocation = torch.cat(res, dim=0)
-        sum_median = torch.sum(project_allocation[:, 1])
+            median_amounts.append(median_amount)
+            votes.append(votes_count)
 
+        votes = torch.cat(votes, dim=0)
+        median_amounts = torch.cat(median_amounts, dim=0)
+
+        sum_median = torch.sum(median_amounts)
         # now scale the allocations to the total amount of OP and filter out those with less than 1500 OP
         scale_factor = self.total_amount / sum_median
-        project_allocation[:, 0] = project_allocation[:, 0] * scale_factor
+        scaled_amounts = median_amounts * scale_factor
         # project is elibible if it has more than the quorum and the amount is greater than the minimum
-        is_eligible = torch.logical_and(project_allocation[:, 1] >= self.min_amount, project_allocation[:, 0] >= self.quorum).reshape(-1, 1)
+        is_eligible = torch.logical_and(scaled_amounts >= self.min_amount, votes >= self.quorum).reshape(-1, 1)
 
-        project_allocation = torch.cat([project_allocation, is_eligible], dim=1)
+        project_allocation = torch.cat([votes, median_amounts, is_eligible], dim=1)
         return project_allocation
