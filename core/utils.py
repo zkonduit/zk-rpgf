@@ -144,7 +144,10 @@ class ProjectAllocator(nn.Module):
         tensors = []
         for project_id in range(0, num_projects):
             project_tensor = tensor[tensor[:, 0] == project_id]
-            tensors.append(project_tensor[:, 1:3])
+            values = project_tensor[:, 1:3]
+            # set to all to int
+            values = values.type(torch.int64)
+            tensors.append(values)
         return tensors
 
 
