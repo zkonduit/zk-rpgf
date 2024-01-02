@@ -66,6 +66,7 @@ class ProjectAllocator(nn.Module):
         self.total_amount = total_amount
         self.min_amount = min_amount
         self.quorum = quorum
+        self.min_ratio = self.min_amount / self.total_amount
 
     def calculate_initial_allocation(self, df) -> pd.DataFrame:
         """
@@ -144,10 +145,10 @@ class ProjectAllocator(nn.Module):
         tensors = []
         for project_id in range(0, num_projects):
             project_tensor = tensor[tensor[:, 0] == project_id]
-            values = project_tensor[:, 1:3]
+            values = project_tensor[:, 2:3]
             # set to all to int
-            values = values.type(torch.int64)
-            tensors.append(values)
+            votes = values.type(torch.int64).reshape(-1)
+            tensors.append(votes)
         return tensors
 
 
@@ -156,24 +157,27 @@ class ProjectAllocator(nn.Module):
         Calculate the raw allocation amount of each project, then scale allocations to the total amount of OP and filter out those with less than 1500 OP.
         """
         median_amounts = []
+        scaled_min_amounts = []
         votes = []
         for tensor in x:
             num_bids = tensor.shape[0]
             votes_count = torch.tensor([num_bids]).reshape(1, 1)
-            median_amount = torch.topk(tensor[:, 1], k=num_bids // 2 + 1).values[-1].reshape(1, 1)
+            median_amount = torch.topk(tensor, k=num_bids // 2 + 1).values[-1].reshape(1, 1)
             # concatenate the results
             median_amounts.append(median_amount)
+            # we keep a running counter of the scaled min amount to prevent having an extremely large sum later on (overflows the extended K capacity of halo2 with SRS with k=26 (max public))
+            scaled_min_amounts.append(median_amount * self.min_ratio)
             votes.append(votes_count)
 
         votes = torch.cat(votes, dim=0)
         median_amounts = torch.cat(median_amounts, dim=0)
+        # sum to get the total scaled min amount
+        scaled_min_amounts = torch.cat(scaled_min_amounts, dim=0)
 
-        sum_median = torch.sum(median_amounts)
-        # now scale the allocations to the total amount of OP and filter out those with less than 1500 OP
-        scale_factor = self.total_amount / sum_median
-        scaled_amounts = median_amounts * scale_factor
+         # now scale the allocations to the total amount of OP and filter out those with less than 1500 OP
+        scaled_min = torch.sum(scaled_min_amounts)
         # project is elibible if it has more than the quorum and the amount is greater than the minimum
-        is_eligible = torch.logical_and(scaled_amounts >= self.min_amount, votes >= self.quorum).reshape(-1, 1)
-
-        project_allocation = torch.cat([votes, median_amounts, is_eligible], dim=1)
+        # instead of comparing the rescaled median amounts here we comare the median amounts to the scaled min amount because a * b / c >= d is equivalent to a >= c * d / b
+        is_eligible = torch.logical_and(median_amounts >= scaled_min, votes >= self.quorum).reshape(-1, 1)
+        project_allocation = torch.cat([median_amounts, is_eligible], dim=1)
         return project_allocation
