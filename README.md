@@ -1,5 +1,5 @@
 
-### ZK-RPG allocator
+### ZK-(RPG)F allocator
 
 
 This repo is a proof of concept of a zk circuit for the Optimism RPGF allocator (see [here](https://github.com/ethereum-optimism/op-analytics/tree/main/rpgf_calculator)). 
