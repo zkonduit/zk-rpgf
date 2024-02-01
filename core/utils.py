@@ -170,7 +170,7 @@ class ProjectAllocator(nn.Module):
             # concatenate the results
             median_amounts.append(median_amount)
             # we keep a running counter of the scaled min amount to prevent having an extremely large sum later on (overflows the extended K capacity of halo2 with SRS with k=26 (max public) when inverted using a lookup table)
-            scaled_min_amounts.append(median_amount * self.min_ratio)
+            scaled_min_amounts.append(median_amount_ceil * self.min_ratio)
             votes.append(votes_count)
 
         votes = torch.cat(votes, dim=0)
@@ -187,38 +187,31 @@ class ProjectAllocator(nn.Module):
         if mask is not None:
             scaled_min_amounts = scaled_min_amounts * mask
 
-        eligible_median = median_amounts * is_eligible
-        eligible_scaled_min = scaled_min_amounts * is_eligible
-        # now scale the allocations to the total amount of OP and filter out those with less than 1500 OP
+         # now scale the allocations to the total amount of OP and filter out those with less than 1500 OP
         #  scaled min is equal to sum(scaled_min_amounts) = sum(median_amounts) * min_ratio = sum(median_amounts) * min_amount / total_amount
-        scaled_min_sum = torch.sum(eligible_scaled_min)
+        scaled_min_sum = torch.sum(scaled_min_amounts)
 
         # meets minimum amount
-        meets_min = eligible_median >= scaled_min_sum
+        meets_min = median_amounts >= scaled_min_sum
 
         # note that this is equivalent to median_amounts / scaled_min = median_amounts * total_amount / (sum(median_amounts) * min_amount)
-        scaled_by_min_median = eligible_median / scaled_min_sum
-        rescaled_median_amounts = self.min_amount * scaled_by_min_median * meets_min
+        scaled_by_min_median = median_amounts / torch.sum(scaled_min_amounts * is_eligible) 
+        rescaled_median_amounts = self.min_amount * scaled_by_min_median * meets_min * is_eligible
 
         project_allocation = torch.cat([votes, median_amounts, is_eligible, rescaled_median_amounts], dim=1)
         return (project_allocation, meets_min)
+
 
     def forward(self, *x, num_iterations=1):
         """
         Calculate the raw allocation amount of each project, then scale allocations to the total amount of OP and filter out those with less than 1500 OP.
         """
 
-        log = get_logger()
-
         project_allocation_first, meets_min = self.inner_loop(*x)
 
         # we've just calculated the first iteration
         for i in range(num_iterations - 1):
             project_allocation_iter, meets_min = self.inner_loop(*x, mask=meets_min)
-            log.info("Check - Current iteration: " + str(i))
-
-        log.info("Check - Current iteration: " + str(num_iterations))
-
         if num_iterations == 1:
             project_allocation = project_allocation_first
         else:
