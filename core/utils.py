@@ -63,6 +63,7 @@ class ProjectAllocator(nn.Module):
         Initialize the ProjectAllocator.
         """
         super(ProjectAllocator, self).__init__()
+        # int tensor
         self.total_amount = int(total_amount)
         self.min_amount = int(min_amount)
         self.quorum = quorum
@@ -172,14 +173,14 @@ class ProjectAllocator(nn.Module):
 
         votes = torch.cat(votes, dim=0).type(torch.int64)
          # is eligible
-        is_eligible = votes >= self.quorum
+        is_eligible = (votes >= self.quorum).type(torch.int64)
 
         median_amounts = torch.cat(median_amounts, dim=0)
 
         if mask is not None:
             median_amounts = median_amounts * mask
 
-        eligible_median = median_amounts * is_eligible
+        eligible_median = (median_amounts).type(torch.int64) * is_eligible.type(torch.int64)
         eligible_scaled_min = eligible_median * self.min_ratio
         # now scale the allocations to the total amount of OP and filter out those with less than 1500 OP
         #  scaled min is equal to sum(scaled_min_amounts) = sum(median_amounts) * min_ratio = sum(median_amounts) * min_amount / total_amount
