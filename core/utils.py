@@ -66,8 +66,8 @@ class ProjectAllocator(nn.Module):
         # int tensor
         self.total_amount = int(total_amount)
         self.min_amount = int(min_amount)
-        self.quorum = quorum
         self.min_ratio = float(self.min_amount) / float(self.total_amount)
+        self.quorum = quorum
 
     def calculate_initial_allocation(self, df) -> pd.DataFrame:
         """
@@ -103,6 +103,28 @@ class ProjectAllocator(nn.Module):
         # now convert to a tensor of shape (n_projects, n_votes, 2) where the first column are the votes and the second column are the amounts
         tensor_project_allocation = torch.tensor(df[['project_id', 'voter_address', 'amount']].values.tolist(), dtype=torch.float64, requires_grad=True)
         return tensor_project_allocation, num_projects
+
+    def convert_anonymized_df_to_tensors(self, df):
+        """
+        Convert the dataframe to a tensor of shape (num_votes, 2) where the first column are the votes and the second column are the amounts
+        """
+
+        # get the number of votes and median amount for each project
+        # convert voter address to integer IDs
+        print(df.head())
+        print(df.tail())
+        num_projects = len(df['project_name'].unique())
+
+
+        tensors = []
+        for i in range(num_projects):
+            # go row by row and get amounts and number of votes
+            # get row i 
+            values = json.loads(df.iloc[i, 1:2].values.tolist()[0])
+            print(values)
+            tensors.append(torch.tensor(values, dtype=torch.int64, requires_grad=False))
+
+        return tensors
 
 
     # scaling the total to RPGF OP total by project and filter out those with < min OP requirement
@@ -180,20 +202,22 @@ class ProjectAllocator(nn.Module):
         if mask is not None:
             median_amounts = median_amounts * mask
 
-        eligible_median = (median_amounts).type(torch.int64) * is_eligible.type(torch.int64)
-        eligible_scaled_min = eligible_median * self.min_ratio
+        eligible_median = median_amounts * is_eligible
+        amount_eligible = torch.sum(eligible_median)
+        scaled_min_amount_eligible = self.min_ratio * amount_eligible
+
+        print("Check - Median Amounts: " + str(median_amounts))
+        print("Check - Eligible Median: " + str(eligible_median))
+        print("Check - Amount Eligible: " + str(amount_eligible))
         # now scale the allocations to the total amount of OP and filter out those with less than 1500 OP
         #  scaled min is equal to sum(scaled_min_amounts) = sum(median_amounts) * min_ratio = sum(median_amounts) * min_amount / total_amount
-        scaled_min_sum = torch.sum(eligible_scaled_min)
 
         # meets minimum amount
-        meets_min = eligible_median >= scaled_min_sum
+        meets_min = eligible_median >= scaled_min_amount_eligible
+        print("Check - Meets Min: " + str(meets_min))
+        scaled_amount = self.min_amount * eligible_median * meets_min / scaled_min_amount_eligible
 
-        # note that this is equivalent to median_amounts / scaled_min = median_amounts * total_amount / (sum(median_amounts) * min_amount)
-        scaled_by_min_median = eligible_median / scaled_min_sum
-        rescaled_median_amounts = self.min_amount * scaled_by_min_median * meets_min
-
-        project_allocation = torch.cat([votes, median_amounts, is_eligible, rescaled_median_amounts], dim=1)
+        project_allocation = torch.cat([votes, median_amounts, is_eligible, scaled_amount], dim=1)
         return (project_allocation, meets_min)
 
     def forward(self, *x, num_iterations=1):
