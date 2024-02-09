@@ -178,7 +178,7 @@ class ProjectAllocator(nn.Module):
             votes = values.type(torch.int64).reshape(-1)
             tensors.append(votes)
         return tensors
-    
+
     def inner_loop(self, *x, mask=None):
         median_amounts = []
         votes = []
@@ -204,7 +204,7 @@ class ProjectAllocator(nn.Module):
 
         eligible_median = median_amounts * is_eligible
         amount_eligible = torch.sum(eligible_median)
-        scaled_min_amount_eligible = self.min_ratio * amount_eligible
+        median_ratio = eligible_median / amount_eligible
 
         print("Check - Median Amounts: " + str(median_amounts))
         print("Check - Eligible Median: " + str(eligible_median))
@@ -213,9 +213,9 @@ class ProjectAllocator(nn.Module):
         #  scaled min is equal to sum(scaled_min_amounts) = sum(median_amounts) * min_ratio = sum(median_amounts) * min_amount / total_amount
 
         # meets minimum amount
-        meets_min = eligible_median >= scaled_min_amount_eligible
+        meets_min = median_ratio >= self.min_ratio
         print("Check - Meets Min: " + str(meets_min))
-        scaled_amount = self.min_amount * eligible_median * meets_min / scaled_min_amount_eligible
+        scaled_amount = self.total_amount * median_ratio * meets_min
 
         project_allocation = torch.cat([votes, median_amounts, is_eligible, scaled_amount], dim=1)
         return (project_allocation, meets_min)
