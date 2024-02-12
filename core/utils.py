@@ -119,7 +119,7 @@ class ProjectAllocator(nn.Module):
         tensors = []
         for i in range(num_projects):
             # go row by row and get amounts and number of votes
-            # get row i 
+            # get row i
             values = json.loads(df.iloc[i, 1:2].values.tolist()[0])
             print(values)
             tensors.append(torch.tensor(values, dtype=torch.int64, requires_grad=False))
