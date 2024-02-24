@@ -217,8 +217,7 @@ class ProjectAllocator(nn.Module):
         print("Check - Meets Min: " + str(meets_min))
         scaled_amount = self.total_amount * median_ratio * meets_min
 
-        project_allocation = torch.cat([votes, median_amounts, is_eligible, scaled_amount], dim=1)
-        return (project_allocation, meets_min)
+        return (scaled_amount, meets_min)
 
     def forward(self, *x, num_iterations=1):
         """
@@ -240,6 +239,6 @@ class ProjectAllocator(nn.Module):
             project_allocation = project_allocation_first
         else:
             # concat columns 0-2 from the first iteration with the last column from the last iteration
-            project_allocation = torch.cat([project_allocation_first[:, 0:3], project_allocation_iter[:, 3:4]], dim=1)
+            project_allocation = project_allocation_iter
         return project_allocation
 
