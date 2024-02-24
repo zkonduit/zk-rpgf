@@ -20,3 +20,11 @@ pip install ezkl torch pandas numpy jupyter onnx plotly onnxruntime
 ```
 
 Then open the notebook and follow the instructions.
+
+There are two notebooks:
+
+- `rpgf3_allocator.ipynb` runs on dummy data for validation.
+- `rpgf3_allocator_real.ipynb` runs on data of truncated vote amounts that the OP foundation has published.
+
+  
+
