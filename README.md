@@ -2,7 +2,7 @@
 ### ZK-(RPG)F allocator
 
 
-This repo is a proof of concept of a zk circuit for the Optimism RPGF allocator (see [here](https://github.com/ethereum-optimism/op-analytics/tree/main/rpgf_calculator)). 
+This repo creates zk circuit equivalents of the Optimism RPGF allocator (see [here](https://github.com/ethereum-optimism/op-analytics/tree/aefa1ee116f5ffb53fa41dfa25e93bca26ff1314/rpgf/rpgf3/rpgf_calculator)). 
 
 We leverage [ezkl](https://github.com/zkonduit/ezkl) to build the circuit directly from the python code in a jupyter notebook `rpgf3_allocator.ipynb`. The notebook has associated markdown cells that explain the circuit and the steps to build it.
 
